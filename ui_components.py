@@ -49,7 +49,7 @@ def render_add_merchant_form():
             height=150
         )
         
-        submitted = st.form_submit_button("Add Merchant", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Add Merchant", type="primary", width=True)
         
         if submitted:
             if not merchant_name:
@@ -109,7 +109,7 @@ def render_merchants_list():
                 if merchant['sell']:
                     df = pd.DataFrame(merchant['sell'], columns=['Item', 'Price'])
                     df['Price'] = df['Price'].apply(lambda x: f"{int(x)}")
-                    st.dataframe(df, hide_index=True, use_container_width=True)
+                    st.dataframe(df, hide_index=True, width=True)
                 else:
                     st.text("Nothing")
 
@@ -139,7 +139,7 @@ def render_add_item_form():
             icon = ""
             uploaded_file = st.file_uploader("Upload icon image", type=["jpg", "jpeg", "png", "gif"], help="You can paste images from clipboard after clicking 'Browse files'")
         
-        submitted = st.form_submit_button("Add Item", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Add Item", type="primary", width=True)
         
         if submitted:
             if not item_name:
