@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-import base64
-from database import add_merchant, get_all_merchants, add_item, get_all_items
+from database import add_merchant, get_all_merchants, add_item, get_all_items, delete_item, get_all_tags
 
 
 def save_uploaded_image(uploaded_file, item_name):
@@ -31,56 +30,56 @@ def render_add_merchant_form():
     """Render the form to add a new merchant"""
     st.header("➕ Add Merchant")
     
+    items = get_all_items()
+    item_names = [item['name'] for item in items]
+    tags = get_all_tags()
+
     with st.form("add_merchant_form", clear_on_submit=True):
         merchant_name = st.text_input("Merchant Name", placeholder="e.g., Erastus")
         
         st.subheader("What Merchant Buys (Tags)")
-        buy_input = st.text_area(
-            "Buy Tags (one per line)", 
-            placeholder="Distance Weapons\nLight Helmets\nRed Spellbooks",
-            height=150
+        buy_tags = st.multiselect(
+            "Select Tags the Merchant Buys",
+            options=tags
         )
+        new_tag = st.text_input("Or add a new tag for buying (optional)")
+        if new_tag and new_tag not in buy_tags:
+            buy_tags.append(new_tag)
         
         st.subheader("What Merchant Sells")
-        st.markdown("Enter items as: `Item Name, Price` (one per line)")
-        sell_input = st.text_area(
-            "Sell Items", 
-            placeholder="Arrow, 1\nWooden Bow, 65",
-            height=150
+        st.markdown("Select items and set a price for each.")
+
+        sell_items = []
+        selected_items = st.multiselect(
+            "Select Items to Sell",
+            options=item_names
         )
-        
-        submitted = st.form_submit_button("Add Merchant", type="primary", use_container_width=True)
+        for item in selected_items:
+            price = st.number_input(
+                f"Set price for {item}",
+                min_value=0.0,
+                value=1.0,
+                step=1.0,
+                key=f"price_{item}"
+            )
+            sell_items.append([item, price])
+
+        submitted = st.form_submit_button("Add Merchant", type="primary", width='stretch')
         
         if submitted:
             if not merchant_name:
                 st.error("Please enter a merchant name")
             else:
-                # Parse buy tags
-                buy_tags = [tag.strip() for tag in buy_input.split('\n') if tag.strip()]
-                
-                # Parse sell items
-                sell_items = []
-                if sell_input.strip():
-                    for line in sell_input.split('\n'):
-                        if ',' in line:
-                            parts = line.split(',')
-                            if len(parts) >= 2:
-                                item_name = parts[0].strip()
-                                try:
-                                    price = float(parts[1].strip())
-                                    sell_items.append([item_name, price])
-                                except ValueError:
-                                    st.warning(f"Skipped invalid price for: {line}")
-                
+                # Remove empty tags and duplicates
+                buy_tags_clean = list({tag.strip() for tag in buy_tags if tag.strip()})
                 # Add to database
-                success = add_merchant(merchant_name, buy_tags, sell_items)
+                success = add_merchant(merchant_name, buy_tags_clean, sell_items)
                 
                 if success:
                     st.success(f"✅ Merchant '{merchant_name}' added successfully!")
                     st.rerun()
                 else:
                     st.error(f"❌ Merchant '{merchant_name}' already exists")
-
 
 def render_merchants_list():
     """Render the list of all merchants"""
@@ -109,10 +108,18 @@ def render_merchants_list():
                 if merchant['sell']:
                     df = pd.DataFrame(merchant['sell'], columns=['Item', 'Price'])
                     df['Price'] = df['Price'].apply(lambda x: f"{int(x)}")
-                    st.dataframe(df, hide_index=True, use_container_width=True)
+                    st.dataframe(df, hide_index=True, width='stretch')
                 else:
                     st.text("Nothing")
-
+                
+                # Delete merchant button
+                if st.button(f"🗑️ Delete '{merchant['name']}'", key=f"delete_merchant_{merchant['name']}"):
+                    from database import delete_merchant
+                    if delete_merchant(merchant['name']):
+                        st.success(f"Deleted merchant '{merchant['name']}'")
+                        st.rerun()
+                    else:
+                        st.error(f"Failed to delete merchant '{merchant['name']}'")
 
 def render_add_item_form():
     """Render the form to add a new item"""
@@ -127,19 +134,18 @@ def render_add_item_form():
             weight = st.number_input("Weight", min_value=0.0, value=1.0, step=0.1)
         
         with col2:
-            tag = st.text_input("Tag/Category", placeholder="e.g., Weapon")
+            tags = get_all_tags()
+            tag_option = st.selectbox(
+                "Select Existing Tag/Category",
+                options=["<Create new tag>"] + tags,
+                index=0
+            )
+            if tag_option == "<Create new tag>":
+                tag = st.text_input("New Tag/Category", placeholder="e.g., Weapon")
+            else:
+                tag = tag_option
         
-        st.subheader("Icon")
-        icon_type = st.radio("Choose icon type:", ["Emoji/Text", "Upload Image"], horizontal=True)
-        
-        if icon_type == "Emoji/Text":
-            icon = st.text_input("Icon", placeholder="e.g., ⚔️", max_chars=10)
-            uploaded_file = None
-        else:
-            icon = ""
-            uploaded_file = st.file_uploader("Upload icon image", type=["jpg", "jpeg", "png", "gif"], help="You can paste images from clipboard after clicking 'Browse files'")
-        
-        submitted = st.form_submit_button("Add Item", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Add Item", type="primary", width='stretch')
         
         if submitted:
             if not item_name:
@@ -147,11 +153,7 @@ def render_add_item_form():
             elif not tag:
                 st.error("Please enter a tag")
             else:
-                # Handle image upload if provided
-                if uploaded_file:
-                    icon = save_uploaded_image(uploaded_file, item_name)
-                
-                success = add_item(item_name, weight, tag, icon)
+                success = add_item(item_name, weight, tag)
                 
                 if success:
                     st.success(f"✅ Item '{item_name}' added successfully!")
@@ -161,7 +163,7 @@ def render_add_item_form():
 
 
 def render_items_list():
-    """Render the list of all items"""
+    """Render the list of all items, grouped by tag"""
     st.header("📦 All Items")
     
     items = get_all_items()
@@ -169,17 +171,49 @@ def render_items_list():
     if not items:
         st.info("No items in database yet. Add one to get started!")
     else:
+        # Group items by tag
+        from collections import defaultdict
+        items_by_tag = defaultdict(list)
         for item in items:
-            with st.expander(f"{item['icon'] if len(item['icon']) < 10 else ''} {item['name']}", expanded=False):
-                col1, col2 = st.columns([1, 3])
-                
-                with col1:
-                    # Display image if it's a file path
-                    if item['icon'] and len(item['icon']) > 10 and os.path.exists(os.path.join("icons", item['icon'])):
-                        st.image(os.path.join("icons", item['icon']), width=100)
-                    elif item['icon']:
-                        st.markdown(f"### {item['icon']}")
-                
-                with col2:
-                    st.markdown(f"**Weight:** {item['weight']}")
-                    st.markdown(f"**Tag:** {item['tag']}")
+            items_by_tag[item['tag']].append(item)
+        
+        # Sort tags alphabetically
+        for tag in sorted(items_by_tag.keys()):
+            st.subheader(f"🏷️ {tag}")
+            for item in items_by_tag[tag]:
+                with st.expander(f"{item['name']}", expanded=False):
+                    col1, col2 = st.columns([2, 5])
+                    with col1:
+                        st.markdown(f"**Weight:** {item['weight']}")
+                        st.markdown(f"**Tag:** {item['tag']}")
+                    with col2:
+                        if st.button(f"🗑️ Delete '{item['name']}'", key=f"delete_{item['name']}"):
+                            if delete_item(item['name']):
+                                st.success(f"Deleted item '{item['name']}'")
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to delete item '{item['name']}'")
+
+def render_merchants_selling_item_tab():
+    """Tab to query which merchants sell a specific item and at what price"""
+    st.header("🔎 Find Merchants Selling an Item")
+    items = get_all_items()
+    item_names = [item['name'] for item in items]
+
+    selected_item = st.selectbox("Select Item to Search", options=item_names)
+    if selected_item:
+        merchants = get_all_merchants()
+        results = []
+        for merchant in merchants:
+            # merchant['sell'] is expected to be a list of [item_name, price]
+            for sell_item in merchant.get('sell', []):
+                if sell_item[0] == selected_item:
+                    results.append({
+                        "Merchant": merchant['name'],
+                        "Price": sell_item[1]
+                    })
+        if results:
+            df = pd.DataFrame(results)
+            st.dataframe(df, hide_index=True, width='stretch')
+        else:
+            st.info(f"No merchants currently sell '{selected_item}'.")

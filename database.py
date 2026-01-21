@@ -61,6 +61,22 @@ def add_merchant(name, buy_tags, sell_items):
         conn.close()
         return False
 
+def delete_merchant(name):
+    """Delete a merchant from the database by its unique name
+
+    Args:
+        name: The name of the merchant to delete
+
+    Returns:
+        True if a merchant was deleted, False otherwise
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM merchants WHERE name = ?", (name,))
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
 
 def get_all_merchants():
     """Get all merchants from database
@@ -109,6 +125,22 @@ def add_item(name, weight, tag, icon=""):
         conn.close()
         return False
 
+def delete_item(name):
+    """Delete an item from the database by its unique name
+
+    Args:
+        name: The name of the item to delete
+
+    Returns:
+        True if an item was deleted, False otherwise
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM items WHERE name = ?", (name,))
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
 
 def get_all_items():
     """Get all items from database
@@ -129,5 +161,17 @@ def get_all_items():
             'icon': row[4]
         })
     conn.close()
-    return items
-    return merchants
+    return items    
+
+def get_all_tags():
+    """Get all unique tags from items in the database
+
+    Returns:
+        List of unique tag strings
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT tag FROM items")
+    tags = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return tags
