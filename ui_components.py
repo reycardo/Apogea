@@ -228,20 +228,14 @@ def render_add_item_form():
         
         with col2:
             tags = get_all_tags()
-            # Always show existing tags first in dropdown
-            tag_options = ["<Create new tag>"] + sorted(tags)
-            tag_option = st.selectbox(
+            # Show existing tags as help text
+            if tags:
+                st.caption(f"Existing tags: {', '.join(sorted(tags))}")
+            tag = st.text_input(
                 "Tag/Category",
-                options=tag_options,
-                index=0,
-                key=f"tag_selector_{st.session_state.item_form_key}"
+                placeholder="e.g., Weapon",
+                key=f"tag_input_{st.session_state.item_form_key}"
             )
-            
-            # Only show text input when creating new tag
-            if tag_option == "<Create new tag>":
-                tag = st.text_input("Enter New Tag", placeholder="e.g., Weapon", key=f"new_tag_input_{st.session_state.item_form_key}")
-            else:
-                tag = tag_option
         
         submitted = st.form_submit_button("Add Item", type="primary", width='stretch')
         
