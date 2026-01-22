@@ -48,7 +48,7 @@ def render_add_merchant_form():
             buy_tags.append(new_tag)
         
         st.subheader("What Merchant Sells")
-        st.markdown("Select items and set a price for each.")
+        st.markdown("Select items and set prices.")
 
         sell_items = []
         selected_items = st.multiselect(
@@ -56,15 +56,24 @@ def render_add_merchant_form():
             options=item_names,
             key=f"selected_items_{st.session_state.merchant_form_key}"
         )
-        for item in selected_items:
-            price = st.number_input(
-                f"Set price for {item}",
-                min_value=0.0,
-                value=1.0,
-                step=1.0,
-                key=f"price_{item}_{st.session_state.merchant_form_key}"
-            )
-            sell_items.append([item, price])
+        
+        # Display price inputs for each selected item
+        if selected_items:
+            st.markdown("**Set Prices:**")
+            for item in selected_items:
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    st.text(item)
+                with col2:
+                    price = st.number_input(
+                        "Price",
+                        min_value=0.0,
+                        value=1.0,
+                        step=1.0,
+                        key=f"price_{item}_{st.session_state.merchant_form_key}",
+                        label_visibility="collapsed"
+                    )
+                sell_items.append([item, price])
 
         submitted = st.form_submit_button("Add Merchant", type="primary", width='stretch')
         
