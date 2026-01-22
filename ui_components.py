@@ -1,7 +1,10 @@
 import streamlit as st
 import pandas as pd
 import os
-from database import add_merchant, get_all_merchants, add_item, get_all_items, delete_item, get_all_tags
+from database import (
+    add_merchant, get_all_merchants, add_item, get_all_items, 
+    delete_item, get_all_tags, add_location, get_all_locations
+)
 
 
 def save_uploaded_image(uploaded_file, item_name):
@@ -33,9 +36,24 @@ def render_add_merchant_form():
     items = get_all_items()
     item_names = [item['name'] for item in items]
     tags = get_all_tags()
+    locations = get_all_locations()
 
     with st.form("add_merchant_form", clear_on_submit=True):
         merchant_name = st.text_input("Merchant Name", placeholder="e.g., Erastus")
+        
+        # Location dropdown with option to add new
+        location_options = ["<Add new location>"] + sorted(locations)
+        location_option = st.selectbox(
+            "Location",
+            options=location_options,
+            index=0,
+            key="location_selector"
+        )
+        
+        if location_option == "<Add new location>":
+            merchant_location = st.text_input("Enter New Location", placeholder="e.g., Magnimar, Old Town", key="new_location_input")
+        else:
+            merchant_location = location_option
         
         st.subheader("What Merchant Buys (Tags)")
         buy_tags = st.multiselect(
@@ -69,11 +87,18 @@ def render_add_merchant_form():
         if submitted:
             if not merchant_name:
                 st.error("Please enter a merchant name")
+            elif not merchant_location:
+                st.error("Please enter a merchant location")
             else:
                 # Remove empty tags and duplicates
                 buy_tags_clean = list({tag.strip() for tag in buy_tags if tag.strip()})
+                
+                # Add location to database if it's new
+                if location_option == "<Add new location>":
+                    add_location(merchant_location)
+                
                 # Add to database
-                success = add_merchant(merchant_name, buy_tags_clean, sell_items)
+                success = add_merchant(merchant_name, merchant_location, buy_tags_clean, sell_items)
                 
                 if success:
                     st.success(f"✅ Merchant '{merchant_name}' added successfully!")
@@ -92,6 +117,10 @@ def render_merchants_list():
     else:
         for merchant in merchants:
             with st.expander(f"🏪 {merchant['name']}", expanded=False):
+                # Display Location
+                if merchant.get('location'):
+                    st.markdown(f"**📍 Location:** {merchant['location']}")
+                    st.markdown("---")
                 
                 # Display Buy tags
                 st.subheader("💰 Buys")

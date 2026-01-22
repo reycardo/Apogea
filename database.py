@@ -32,10 +32,24 @@ def initialize_database():
         CREATE TABLE IF NOT EXISTS merchants (
             id SERIAL PRIMARY KEY,
             name TEXT UNIQUE NOT NULL,
+            location TEXT,
             buy_tags TEXT,
             sell_items TEXT
         )
     ''')
+    
+    # Add location column if it doesn't exist (for existing databases)
+    cursor.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name='merchants' AND column_name='location'
+            ) THEN
+                ALTER TABLE merchants ADD COLUMN location TEXT;
+            END IF;
+        END $$;
+    """)
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS items (
@@ -44,6 +58,13 @@ def initialize_database():
             weight REAL NOT NULL,
             tag TEXT NOT NULL,
             icon TEXT
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS locations (
+            id SERIAL PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL
         )
     ''')
     
@@ -63,11 +84,12 @@ def return_connection(conn):
     pool.putconn(conn)
 
 
-def add_merchant(name, buy_tags, sell_items):
+def add_merchant(name, location, buy_tags, sell_items):
     """Add a merchant to the database
     
     Args:
         name: Merchant name
+        location: Merchant location
         buy_tags: List of tags the merchant buys
         sell_items: List of [item_name, price] pairs
         
@@ -79,8 +101,8 @@ def add_merchant(name, buy_tags, sell_items):
     
     try:
         cursor.execute(
-            "INSERT INTO merchants (name, buy_tags, sell_items) VALUES (%s, %s, %s)",
-            (name, json.dumps(buy_tags), json.dumps(sell_items))
+            "INSERT INTO merchants (name, location, buy_tags, sell_items) VALUES (%s, %s, %s, %s)",
+            (name, location, json.dumps(buy_tags), json.dumps(sell_items))
         )
         conn.commit()
         cursor.close()
@@ -114,17 +136,18 @@ def get_all_merchants():
     """Get all merchants from database
     
     Returns:
-        List of merchant dictionaries with id, name, buy tags, and sell items
+        List of merchant dictionaries with name, location, buy tags, and sell items
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT name, buy_tags, sell_items FROM merchants")
+    cursor.execute("SELECT name, location, buy_tags, sell_items FROM merchants")
     merchants = []
     for row in cursor.fetchall():
         merchants.append({            
             'name': row[0],
-            'buy': json.loads(row[1]),
-            'sell': json.loads(row[2])
+            'location': row[1] or '',
+            'buy': json.loads(row[2]),
+            'sell': json.loads(row[3])
         })
     cursor.close()
     return_connection(conn)
@@ -214,3 +237,46 @@ def get_all_tags():
     cursor.close()
     return_connection(conn)
     return tags
+
+
+def add_location(name):
+    """Add a location to the database
+    
+    Args:
+        name: Location name
+        
+    Returns:
+        True if successful, False if location already exists
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(
+            "INSERT INTO locations (name) VALUES (%s)",
+            (name,)
+        )
+        conn.commit()
+        cursor.close()
+        return_connection(conn)
+        return True
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        cursor.close()
+        return_connection(conn)
+        return False
+
+
+def get_all_locations():
+    """Get all locations from database
+    
+    Returns:
+        List of location names
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM locations ORDER BY name")
+    locations = [row[0] for row in cursor.fetchall()]
+    cursor.close()
+    return_connection(conn)
+    return locations
