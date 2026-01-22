@@ -7,28 +7,6 @@ from database import (
 )
 
 
-def save_uploaded_image(uploaded_file, item_name):
-    """Save uploaded image and return the filename"""
-    if uploaded_file is None:
-        return ""
-    
-    # Create icons directory if it doesn't exist
-    os.makedirs("icons", exist_ok=True)
-    
-    # Create safe filename
-    safe_name = "".join(c for c in item_name if c.isalnum() or c in (' ', '_')).strip()
-    safe_name = safe_name.replace(' ', '_')
-    ext = os.path.splitext(uploaded_file.name)[1]
-    filename = f"{safe_name}{ext}"
-    filepath = os.path.join("icons", filename)
-    
-    # Save file
-    with open(filepath, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    
-    return filename
-
-
 def render_add_merchant_form():
     """Render the form to add a new merchant"""
     st.header("➕ Add Merchant")
@@ -37,8 +15,12 @@ def render_add_merchant_form():
     item_names = [item['name'] for item in items]
     tags = get_all_tags()
     locations = get_all_locations()
+    
+    # Initialize form counter in session state
+    if 'merchant_form_key' not in st.session_state:
+        st.session_state.merchant_form_key = 0
 
-    with st.form("add_merchant_form", clear_on_submit=True):
+    with st.form(f"add_merchant_form_{st.session_state.merchant_form_key}", clear_on_submit=True):
         merchant_name = st.text_input("Merchant Name", placeholder="e.g., Erastus")
         
         # Location dropdown with option to add new
@@ -47,20 +29,21 @@ def render_add_merchant_form():
             "Location",
             options=location_options,
             index=0,
-            key="location_selector"
+            key=f"location_selector_{st.session_state.merchant_form_key}"
         )
         
         if location_option == "<Add new location>":
-            merchant_location = st.text_input("Enter New Location", placeholder="e.g., Magnimar, Old Town", key="new_location_input")
+            merchant_location = st.text_input("Enter New Location", placeholder="e.g., Magnimar, Old Town", key=f"new_location_input_{st.session_state.merchant_form_key}")
         else:
             merchant_location = location_option
         
         st.subheader("What Merchant Buys (Tags)")
         buy_tags = st.multiselect(
             "Select Tags the Merchant Buys",
-            options=tags
+            options=tags,
+            key=f"buy_tags_{st.session_state.merchant_form_key}"
         )
-        new_tag = st.text_input("Or add a new tag for buying (optional)")
+        new_tag = st.text_input("Or add a new tag for buying (optional)", key=f"new_tag_{st.session_state.merchant_form_key}")
         if new_tag and new_tag not in buy_tags:
             buy_tags.append(new_tag)
         
@@ -70,7 +53,8 @@ def render_add_merchant_form():
         sell_items = []
         selected_items = st.multiselect(
             "Select Items to Sell",
-            options=item_names
+            options=item_names,
+            key=f"selected_items_{st.session_state.merchant_form_key}"
         )
         for item in selected_items:
             price = st.number_input(
@@ -78,7 +62,7 @@ def render_add_merchant_form():
                 min_value=0.0,
                 value=1.0,
                 step=1.0,
-                key=f"price_{item}"
+                key=f"price_{item}_{st.session_state.merchant_form_key}"
             )
             sell_items.append([item, price])
 
@@ -102,6 +86,8 @@ def render_add_merchant_form():
                 
                 if success:
                     st.success(f"✅ Merchant '{merchant_name}' added successfully!")
+                    # Increment form key to reset the form
+                    st.session_state.merchant_form_key += 1
                     st.rerun()
                 else:
                     st.error(f"❌ Merchant '{merchant_name}' already exists")
