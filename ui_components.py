@@ -214,7 +214,11 @@ def render_add_item_form():
     """Render the form to add a new item"""
     st.header("➕ Add Item")
     
-    with st.form("add_item_form", clear_on_submit=True):
+    # Initialize form counter in session state
+    if 'item_form_key' not in st.session_state:
+        st.session_state.item_form_key = 0
+    
+    with st.form(f"add_item_form_{st.session_state.item_form_key}", clear_on_submit=True):
         item_name = st.text_input("Item Name", placeholder="e.g., Iron Sword")
         
         col1, col2 = st.columns(2)
@@ -230,12 +234,12 @@ def render_add_item_form():
                 "Tag/Category",
                 options=tag_options,
                 index=0,
-                key="tag_selector"
+                key=f"tag_selector_{st.session_state.item_form_key}"
             )
             
             # Only show text input when creating new tag
             if tag_option == "<Create new tag>":
-                tag = st.text_input("Enter New Tag", placeholder="e.g., Weapon", key="new_tag_input")
+                tag = st.text_input("Enter New Tag", placeholder="e.g., Weapon", key=f"new_tag_input_{st.session_state.item_form_key}")
             else:
                 tag = tag_option
         
@@ -251,6 +255,8 @@ def render_add_item_form():
                 
                 if success:
                     st.success(f"✅ Item '{item_name}' added successfully!")
+                    # Increment form key to fully reset the form
+                    st.session_state.item_form_key += 1
                     st.rerun()
                 else:
                     st.error(f"❌ Item '{item_name}' already exists")
