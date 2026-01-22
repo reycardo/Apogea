@@ -306,6 +306,7 @@ def render_merchants_selling_item_tab():
                 if sell_item[0] == selected_item:
                     results.append({
                         "Merchant": merchant['name'],
+                        "Location": merchant.get('location', 'N/A'),
                         "Price": sell_item[1]
                     })
         if results:
