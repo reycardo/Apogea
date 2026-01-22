@@ -135,13 +135,18 @@ def render_add_item_form():
         
         with col2:
             tags = get_all_tags()
+            # Always show existing tags first in dropdown
+            tag_options = ["<Create new tag>"] + sorted(tags)
             tag_option = st.selectbox(
-                "Select Existing Tag/Category",
-                options=["<Create new tag>"] + tags,
-                index=0
+                "Tag/Category",
+                options=tag_options,
+                index=0,
+                key="tag_selector"
             )
+            
+            # Only show text input when creating new tag
             if tag_option == "<Create new tag>":
-                tag = st.text_input("New Tag/Category", placeholder="e.g., Weapon")
+                tag = st.text_input("Enter New Tag", placeholder="e.g., Weapon", key="new_tag_input")
             else:
                 tag = tag_option
         
