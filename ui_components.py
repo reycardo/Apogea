@@ -19,21 +19,46 @@ def render_add_merchant_form():
     # Initialize form counter in session state
     if 'merchant_form_key' not in st.session_state:
         st.session_state.merchant_form_key = 0
+    
+    # Initialize merchant items list for this form
+    merchant_items_key = f'merchant_items_{st.session_state.merchant_form_key}'
+    if merchant_items_key not in st.session_state:
+        st.session_state[merchant_items_key] = []
+    
+    # Initialize form data preservation
+    form_data_key = f'merchant_form_data_{st.session_state.merchant_form_key}'
+    if form_data_key not in st.session_state:
+        st.session_state[form_data_key] = {
+            'name': '',
+            'location_option': 0,
+            'location_text': '',
+            'buy_tags': [],
+            'new_tag': ''
+        }
 
-    with st.form(f"add_merchant_form_{st.session_state.merchant_form_key}", clear_on_submit=True):
-        merchant_name = st.text_input("Merchant Name", placeholder="e.g., Erastus")
+    with st.form(f"add_merchant_form_{st.session_state.merchant_form_key}"):
+        merchant_name = st.text_input(
+            "Merchant Name", 
+            placeholder="e.g., Erastus",
+            value=st.session_state[form_data_key]['name']
+        )
         
         # Location dropdown with option to add new
         location_options = ["<Add new location>"] + sorted(locations)
         location_option = st.selectbox(
             "Location",
             options=location_options,
-            index=0,
+            index=st.session_state[form_data_key]['location_option'],
             key=f"location_selector_{st.session_state.merchant_form_key}"
         )
         
         if location_option == "<Add new location>":
-            merchant_location = st.text_input("Enter New Location", placeholder="e.g., Magnimar, Old Town", key=f"new_location_input_{st.session_state.merchant_form_key}")
+            merchant_location = st.text_input(
+                "Enter New Location", 
+                placeholder="e.g., Magnimar, Old Town", 
+                value=st.session_state[form_data_key]['location_text'],
+                key=f"new_location_input_{st.session_state.merchant_form_key}"
+            )
         else:
             merchant_location = location_option
         
@@ -41,41 +66,77 @@ def render_add_merchant_form():
         buy_tags = st.multiselect(
             "Select Tags the Merchant Buys",
             options=tags,
+            default=st.session_state[form_data_key]['buy_tags'],
             key=f"buy_tags_{st.session_state.merchant_form_key}"
         )
-        new_tag = st.text_input("Or add a new tag for buying (optional)", key=f"new_tag_{st.session_state.merchant_form_key}")
+        new_tag = st.text_input(
+            "Or add a new tag for buying (optional)", 
+            value=st.session_state[form_data_key]['new_tag'],
+            key=f"new_tag_{st.session_state.merchant_form_key}"
+        )
         if new_tag and new_tag not in buy_tags:
             buy_tags.append(new_tag)
         
         st.subheader("What Merchant Sells")
-        st.markdown("Select items and set prices.")
-
-        sell_items = []
-        selected_items = st.multiselect(
-            "Select Items to Sell",
+        
+        # Item selection - multiselect
+        items_to_add = st.multiselect(
+            "Select Items to Add",
             options=item_names,
-            key=f"selected_items_{st.session_state.merchant_form_key}"
+            key=f"items_select_{st.session_state.merchant_form_key}"
         )
         
-        # Display price inputs for each selected item
-        if selected_items:
-            st.markdown("**Set Prices:**")
-            for item in selected_items:
-                col1, col2 = st.columns([2, 1])
+        add_items_btn = st.form_submit_button("➕ Add Items", type="secondary")
+        
+        # Add items to list when button is clicked
+        if add_items_btn and items_to_add:
+            # Save form data before rerun
+            st.session_state[form_data_key]['name'] = merchant_name
+            st.session_state[form_data_key]['location_option'] = location_options.index(location_option)
+            st.session_state[form_data_key]['location_text'] = merchant_location if location_option == "<Add new location>" else ''
+            st.session_state[form_data_key]['buy_tags'] = buy_tags
+            st.session_state[form_data_key]['new_tag'] = new_tag
+            
+            # Add items
+            existing_items = [item[0] for item in st.session_state[merchant_items_key]]
+            for item_name in items_to_add:
+                if item_name not in existing_items:
+                    st.session_state[merchant_items_key].append([item_name, 1.0])
+            st.rerun()
+        
+        # Display added items with price inputs
+        sell_items = []
+        if st.session_state[merchant_items_key]:
+            st.markdown("**Items to Sell:**")
+            items_to_remove = []
+            
+            for idx, (item, default_price) in enumerate(st.session_state[merchant_items_key]):
+                col1, col2, col3 = st.columns([2, 1, 0.5])
                 with col1:
                     st.text(item)
                 with col2:
                     price = st.number_input(
                         "Price",
-                        min_value=0.0,
-                        value=1.0,
-                        step=1.0,
-                        key=f"price_{item}_{st.session_state.merchant_form_key}",
+                        min_value=0,
+                        value=float(default_price),
+                        step=1,
+                        key=f"price_{item}_{idx}_{st.session_state.merchant_form_key}",
                         label_visibility="collapsed"
                     )
+                with col3:
+                    if st.form_submit_button("🗑️", key=f"remove_{item}_{idx}_{st.session_state.merchant_form_key}"):
+                        items_to_remove.append(idx)
+                
+                # Update price in session state
+                st.session_state[merchant_items_key][idx][1] = price
                 sell_items.append([item, price])
+            
+            # Remove items marked for deletion
+            for idx in sorted(items_to_remove, reverse=True):
+                st.session_state[merchant_items_key].pop(idx)
+                st.rerun()
 
-        submitted = st.form_submit_button("Add Merchant", type="primary", width='stretch')
+        submitted = st.form_submit_button("✅ Add Merchant", type="primary", use_container_width=True)
         
         if submitted:
             if not merchant_name:
@@ -95,7 +156,11 @@ def render_add_merchant_form():
                 
                 if success:
                     st.success(f"✅ Merchant '{merchant_name}' added successfully!")
-                    # Increment form key to reset the form
+                    # Clear items list, form data, and increment form key to reset the form
+                    if merchant_items_key in st.session_state:
+                        del st.session_state[merchant_items_key]
+                    if form_data_key in st.session_state:
+                        del st.session_state[form_data_key]
                     st.session_state.merchant_form_key += 1
                     st.rerun()
                 else:
