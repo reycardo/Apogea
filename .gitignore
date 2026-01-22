@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Streamlit secrets (DO NOT COMMIT!)
+.streamlit/secrets.toml
+
+# Local SQLite database (no longer used)
+*.db

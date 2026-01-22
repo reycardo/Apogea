@@ -1,15 +1,36 @@
-import sqlite3
+import psycopg2
+from psycopg2 import pool
 import json
+import streamlit as st
 
+
+# Connection pool for efficient database connections
+connection_pool = None
+
+def get_connection_pool():
+    """Initialize and return the connection pool"""
+    global connection_pool
+    if connection_pool is None:
+        # Get database URL from Streamlit secrets
+        database_url = st.secrets.get("DATABASE_URL", "")
+        if not database_url:
+            st.error("⚠️ DATABASE_URL not found in secrets. Please configure your database connection.")
+            st.stop()
+        
+        connection_pool = pool.SimpleConnectionPool(
+            1, 10,  # min and max connections
+            database_url
+        )
+    return connection_pool
 
 def initialize_database():
     """Create database and tables if they don't exist"""
-    conn = sqlite3.connect('merchants.db', check_same_thread=False)
+    conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS merchants (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT UNIQUE NOT NULL,
             buy_tags TEXT,
             sell_items TEXT
@@ -18,7 +39,7 @@ def initialize_database():
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT UNIQUE NOT NULL,
             weight REAL NOT NULL,
             tag TEXT NOT NULL,
@@ -27,12 +48,19 @@ def initialize_database():
     ''')
     
     conn.commit()
-    conn.close()
+    cursor.close()
+    return_connection(conn)
 
 
 def get_connection():
-    """Get database connection"""
-    return sqlite3.connect('merchants.db', check_same_thread=False)
+    """Get database connection from pool"""
+    pool = get_connection_pool()
+    return pool.getconn()
+
+def return_connection(conn):
+    """Return connection to pool"""
+    pool = get_connection_pool()
+    pool.putconn(conn)
 
 
 def add_merchant(name, buy_tags, sell_items):
@@ -51,14 +79,17 @@ def add_merchant(name, buy_tags, sell_items):
     
     try:
         cursor.execute(
-            "INSERT INTO merchants (name, buy_tags, sell_items) VALUES (?, ?, ?)",
+            "INSERT INTO merchants (name, buy_tags, sell_items) VALUES (%s, %s, %s)",
             (name, json.dumps(buy_tags), json.dumps(sell_items))
         )
         conn.commit()
-        conn.close()
+        cursor.close()
+        return_connection(conn)
         return True
-    except sqlite3.IntegrityError:
-        conn.close()
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        cursor.close()
+        return_connection(conn)
         return False
 
 def delete_merchant(name):
@@ -72,10 +103,11 @@ def delete_merchant(name):
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM merchants WHERE name = ?", (name,))
+    cursor.execute("DELETE FROM merchants WHERE name = %s", (name,))
     deleted = cursor.rowcount > 0
     conn.commit()
-    conn.close()
+    cursor.close()
+    return_connection(conn)
     return deleted
 
 def get_all_merchants():
@@ -94,7 +126,8 @@ def get_all_merchants():
             'buy': json.loads(row[1]),
             'sell': json.loads(row[2])
         })
-    conn.close()
+    cursor.close()
+    return_connection(conn)
     return merchants
 
 
@@ -115,14 +148,17 @@ def add_item(name, weight, tag, icon=""):
     
     try:
         cursor.execute(
-            "INSERT INTO items (name, weight, tag, icon) VALUES (?, ?, ?, ?)",
+            "INSERT INTO items (name, weight, tag, icon) VALUES (%s, %s, %s, %s)",
             (name, weight, tag, icon)
         )
         conn.commit()
-        conn.close()
+        cursor.close()
+        return_connection(conn)
         return True
-    except sqlite3.IntegrityError:
-        conn.close()
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        cursor.close()
+        return_connection(conn)
         return False
 
 def delete_item(name):
@@ -136,10 +172,11 @@ def delete_item(name):
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM items WHERE name = ?", (name,))
+    cursor.execute("DELETE FROM items WHERE name = %s", (name,))
     deleted = cursor.rowcount > 0
     conn.commit()
-    conn.close()
+    cursor.close()
+    return_connection(conn)
     return deleted
 
 def get_all_items():
@@ -160,7 +197,8 @@ def get_all_items():
             'tag': row[3],
             'icon': row[4]
         })
-    conn.close()
+    cursor.close()
+    return_connection(conn)
     return items    
 
 def get_all_tags():
@@ -173,5 +211,6 @@ def get_all_tags():
     cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT tag FROM items")
     tags = [row[0] for row in cursor.fetchall()]
-    conn.close()
+    cursor.close()
+    return_connection(conn)
     return tags
