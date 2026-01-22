@@ -228,13 +228,15 @@ def render_add_item_form():
         
         with col2:
             tags = get_all_tags()
-            # Show existing tags as help text
-            if tags:
-                st.caption(f"Existing tags: {', '.join(sorted(tags))}")
-            tag = st.text_input(
+            # Use selectbox that filters as you type
+            tag_options = sorted(tags)
+            tag = st.selectbox(
                 "Tag/Category",
-                placeholder="e.g., Weapon",
-                key=f"tag_input_{st.session_state.item_form_key}"
+                options=tag_options,
+                index=len(tag_options) - 1 if not tags else 0,
+                help="Start typing to filter existing tags",
+                key=f"tag_selector_{st.session_state.item_form_key}",
+                accept_new_options=True
             )
         
         submitted = st.form_submit_button("Add Item", type="primary", width='stretch')
@@ -242,10 +244,10 @@ def render_add_item_form():
         if submitted:
             if not item_name:
                 st.error("Please enter an item name")
-            elif not tag:
+            elif not tag or tag == "+ Create New Tag":
                 st.error("Please enter a tag")
             else:
-                success = add_item(item_name, weight, tag)
+                success = add_item(item_name, weight, tag.strip())
                 
                 if success:
                     st.success(f"✅ Item '{item_name}' added successfully!")
