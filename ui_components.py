@@ -3,9 +3,8 @@ import pandas as pd
 import os
 from database import (
     add_merchant, get_all_merchants, add_item, get_all_items, 
-    delete_item, get_all_tags, add_location, get_all_locations
+    delete_item, get_all_tags, add_location, get_all_locations, delete_merchant
 )
-
 
 def render_add_merchant_form():
     """Render the form to add a new merchant"""
@@ -171,6 +170,7 @@ def render_merchants_list():
     st.header("📋 All Merchants")
     
     merchants = get_all_merchants()
+    merchants.sort(key=lambda x: x["name"])
     
     if not merchants:
         st.info("No merchants in database yet. Add one to get started!")
@@ -202,8 +202,7 @@ def render_merchants_list():
                     st.text("Nothing")
                 
                 # Delete merchant button
-                if st.button(f"🗑️ Delete '{merchant['name']}'", key=f"delete_merchant_{merchant['name']}"):
-                    from database import delete_merchant
+                if st.button(f"🗑️ Delete '{merchant['name']}'", key=f"delete_merchant_{merchant['name']}"):                    
                     if delete_merchant(merchant['name']):
                         st.success(f"Deleted merchant '{merchant['name']}'")
                         st.rerun()
@@ -310,6 +309,7 @@ def render_merchants_selling_item_tab():
                         "Price": sell_item[1]
                     })
         if results:
+            results.sort(key=lambda x: x["Merchant"])
             df = pd.DataFrame(results)
             st.dataframe(df, hide_index=True, width='stretch')
         else:
