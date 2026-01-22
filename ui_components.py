@@ -118,7 +118,7 @@ def render_add_merchant_form():
                     price = st.number_input(
                         "Price",
                         min_value=0,
-                        value=float(default_price),
+                        value=int(default_price),
                         step=1,
                         key=f"price_{item}_{idx}_{st.session_state.merchant_form_key}",
                         label_visibility="collapsed"
