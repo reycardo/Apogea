@@ -3,7 +3,8 @@ import pandas as pd
 import os
 from database import (
     add_merchant, get_all_merchants, add_item, get_all_items, 
-    delete_item, get_all_tags, add_location, get_all_locations, delete_merchant
+    delete_item, get_all_tags, add_location, get_all_locations, delete_merchant,
+    update_merchant_sell_items
 )
 
 def render_add_merchant_form():
@@ -175,6 +176,10 @@ def render_merchants_list():
     if not merchants:
         st.info("No merchants in database yet. Add one to get started!")
     else:
+        # Get all items for the dropdown
+        items = get_all_items()
+        item_names = [item['name'] for item in items]
+        
         for merchant in merchants:
             with st.expander(f"🏪 {merchant['name']}", expanded=False):
                 # Display Location
@@ -200,6 +205,52 @@ def render_merchants_list():
                     st.dataframe(df, hide_index=True, width='stretch')
                 else:
                     st.text("Nothing")
+                
+                # Add item to merchant section
+                st.markdown("---")
+                st.subheader("➕ Add Item to Inventory")
+                
+                with st.form(f"add_item_to_{merchant['name']}"):
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        # Filter out items already sold by this merchant
+                        existing_item_names = [item[0] for item in merchant['sell']]
+                        available_items = [item for item in item_names if item not in existing_item_names]
+                        
+                        if available_items:
+                            new_item = st.selectbox(
+                                "Select Item",
+                                options=available_items,
+                                key=f"new_item_select_{merchant['name']}"
+                            )
+                        else:
+                            st.info("All items are already in this merchant's inventory")
+                            new_item = None
+                    
+                    with col2:
+                        if available_items:
+                            new_price = st.number_input(
+                                "Price",
+                                min_value=0,
+                                value=1,
+                                step=1,
+                                key=f"new_price_{merchant['name']}"
+                            )
+                    
+                    if available_items:
+                        submitted = st.form_submit_button("➕ Add Item", type="secondary")
+                        
+                        if submitted and new_item:
+                            # Add the new item to the merchant's sell list
+                            updated_sell_items = merchant['sell'] + [[new_item, new_price]]
+                            if update_merchant_sell_items(merchant['name'], updated_sell_items):
+                                st.success(f"Added '{new_item}' to {merchant['name']}'s inventory")
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to add item to {merchant['name']}'s inventory")
+                
+                st.markdown("---")
                 
                 # Delete merchant button
                 if st.button(f"🗑️ Delete '{merchant['name']}'", key=f"delete_merchant_{merchant['name']}"):                    

@@ -280,3 +280,33 @@ def get_all_locations():
     cursor.close()
     return_connection(conn)
     return locations
+
+
+def update_merchant_sell_items(merchant_name, sell_items):
+    """Update the sell items for a merchant
+    
+    Args:
+        merchant_name: Name of the merchant to update
+        sell_items: List of [item_name, price] pairs
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(
+            "UPDATE merchants SET sell_items = %s WHERE name = %s",
+            (json.dumps(sell_items), merchant_name)
+        )
+        conn.commit()
+        success = cursor.rowcount > 0
+        cursor.close()
+        return_connection(conn)
+        return success
+    except Exception as e:
+        conn.rollback()
+        cursor.close()
+        return_connection(conn)
+        return False
