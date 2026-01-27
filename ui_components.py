@@ -2,19 +2,20 @@ import streamlit as st
 import pandas as pd
 import os
 from database import (
-    add_merchant, get_all_merchants, add_item, get_all_items, 
-    delete_item, get_all_tags, add_location, get_all_locations, delete_merchant,
-    update_merchant_sell_items
+    add_merchant, add_item, get_all_items, 
+    delete_item, get_all_tags, add_location, delete_merchant,
+    update_merchant_sell_items,
+    get_cached_merchants, get_cached_items, get_cached_locations
 )
 
 def render_add_merchant_form():
     """Render the form to add a new merchant"""
     st.header("➕ Add Merchant")
     
-    items = get_all_items()
+    items = get_cached_items()
     item_names = [item['name'] for item in items]
-    tags = get_all_tags()
-    locations = get_all_locations()
+    tags = get_all_tags()  # tags are dynamic, so keep querying
+    locations = get_cached_locations()
     
     # Initialize form counter in session state
     if 'merchant_form_key' not in st.session_state:
@@ -170,7 +171,7 @@ def render_merchants_list():
     """Render the list of all merchants"""
     st.header("📋 All Merchants")
     
-    merchants = get_all_merchants()
+    merchants = get_cached_merchants()
     merchants.sort(key=lambda x: x["name"])
     
     if not merchants:
@@ -312,7 +313,7 @@ def render_items_list():
     """Render the list of all items, grouped by tag"""
     st.header("📦 All Items")
     
-    items = get_all_items()
+    items = get_cached_items()
     
     if not items:
         st.info("No items in database yet. Add one to get started!")
@@ -343,12 +344,12 @@ def render_items_list():
 def render_merchants_selling_item_tab():
     """Tab to query which merchants sell a specific item and at what price"""
     st.header("🔎 Find Merchants Selling an Item")
-    items = get_all_items()
+    items = get_cached_items()
     item_names = [item['name'] for item in items]
 
     selected_item = st.selectbox("Select Item to Search", options=item_names)
     if selected_item:
-        merchants = get_all_merchants()
+        merchants = get_cached_merchants()
         results = []
         for merchant in merchants:
             # merchant['sell'] is expected to be a list of [item_name, price]

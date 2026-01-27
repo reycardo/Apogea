@@ -1,5 +1,5 @@
 import streamlit as st
-from database import initialize_database
+from database import initialize_database, load_all_tables_to_cache
 from ui_components import (
     render_add_merchant_form,
     render_merchants_list,
@@ -8,10 +8,12 @@ from ui_components import (
     render_merchants_selling_item_tab
 )
 
-# Initialize database on first run
+
+# Initialize database and preload cache on first run
 if 'db_initialized' not in st.session_state:
     st.session_state.db_initialized = True
     initialize_database()
+    load_all_tables_to_cache()
 
 # Streamlit UI
 st.set_page_config(page_title="Merchant Database", page_icon="🏪", layout="wide")

@@ -1,7 +1,39 @@
+
 import psycopg2
 from psycopg2 import pool
 import json
 import streamlit as st
+
+# Global cache for table data
+_CACHE = {
+    'merchants': None,
+    'items': None,
+    'locations': None
+}
+
+def load_all_tables_to_cache():
+    """Load all tables into the global cache at startup."""
+    _CACHE['merchants'] = get_all_merchants()
+    _CACHE['items'] = get_all_items()
+    _CACHE['locations'] = get_all_locations()
+
+def get_cached_merchants():
+    """Return cached merchants list."""
+    if _CACHE['merchants'] is None:
+        load_all_tables_to_cache()
+    return _CACHE['merchants']
+
+def get_cached_items():
+    """Return cached items list."""
+    if _CACHE['items'] is None:
+        load_all_tables_to_cache()
+    return _CACHE['items']
+
+def get_cached_locations():
+    """Return cached locations list."""
+    if _CACHE['locations'] is None:
+        load_all_tables_to_cache()
+    return _CACHE['locations']
 
 
 # Connection pool for efficient database connections
@@ -107,6 +139,8 @@ def add_merchant(name, location, buy_tags, sell_items):
         conn.commit()
         cursor.close()
         return_connection(conn)
+        # Invalidate cache
+        _CACHE['merchants'] = None
         return True
     except psycopg2.IntegrityError:
         conn.rollback()
@@ -130,6 +164,8 @@ def delete_merchant(name):
     conn.commit()
     cursor.close()
     return_connection(conn)
+    # Invalidate cache
+    _CACHE['merchants'] = None
     return deleted
 
 def get_all_merchants():
@@ -177,6 +213,8 @@ def add_item(name, weight, tag, icon=""):
         conn.commit()
         cursor.close()
         return_connection(conn)
+        # Invalidate cache
+        _CACHE['items'] = None
         return True
     except psycopg2.IntegrityError:
         conn.rollback()
@@ -200,6 +238,8 @@ def delete_item(name):
     conn.commit()
     cursor.close()
     return_connection(conn)
+    # Invalidate cache
+    _CACHE['items'] = None
     return deleted
 
 def get_all_items():
@@ -259,6 +299,8 @@ def add_location(name):
         conn.commit()
         cursor.close()
         return_connection(conn)
+        # Invalidate cache
+        _CACHE['locations'] = None
         return True
     except psycopg2.IntegrityError:
         conn.rollback()
@@ -304,6 +346,8 @@ def update_merchant_sell_items(merchant_name, sell_items):
         success = cursor.rowcount > 0
         cursor.close()
         return_connection(conn)
+        # Invalidate cache
+        _CACHE['merchants'] = None
         return success
     except Exception as e:
         conn.rollback()
