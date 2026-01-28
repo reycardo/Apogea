@@ -172,7 +172,6 @@ def render_merchants_list():
     st.header("📋 All Merchants")
     
     merchants = get_cached_merchants()
-    merchants.sort(key=lambda x: x["name"])
     
     if not merchants:
         st.info("No merchants in database yet. Add one to get started!")
@@ -181,85 +180,97 @@ def render_merchants_list():
         items = get_all_items()
         item_names = [item['name'] for item in items]
         
+        # Group merchants by location
+        from collections import defaultdict
+        merchants_by_location = defaultdict(list)
         for merchant in merchants:
-            with st.expander(f"🏪 {merchant['name']}", expanded=False):
-                # Display Location
-                if merchant.get('location'):
-                    st.markdown(f"**📍 Location:** {merchant['location']}")
-                    st.markdown("---")
-                
-                # Display Buy tags
-                st.subheader("💰 Buys")
-                if merchant['buy']:
-                    for tag in merchant['buy']:
-                        st.markdown(f"- {tag}")
-                else:
-                    st.text("Nothing")
-                
-                st.markdown("---")
-                
-                # Display Sell items
-                st.subheader("💼 Sells")
-                if merchant['sell']:
-                    df = pd.DataFrame(merchant['sell'], columns=['Item', 'Price'])
-                    df['Price'] = df['Price'].apply(lambda x: f"{int(x)}")
-                    st.dataframe(df, hide_index=True, width='stretch')
-                else:
-                    st.text("Nothing")
-                
-                # Add item to merchant section
-                st.markdown("---")
-                st.subheader("➕ Add Item to Inventory")
-                
-                with st.form(f"add_item_to_{merchant['name']}"):
-                    col1, col2 = st.columns([3, 1])
+            location = merchant.get('location', 'Unknown Location')
+            merchants_by_location[location].append(merchant)
+        
+        # Sort locations alphabetically
+        for location in sorted(merchants_by_location.keys()):
+            st.subheader(f"📍 {location}")
+            
+            # Sort merchants by name within each location
+            for merchant in sorted(merchants_by_location[location], key=lambda x: x["name"]):
+                with st.expander(f"🏪 {merchant['name']}", expanded=False):
+                    # Display Location
+                    if merchant.get('location'):
+                        st.markdown(f"**📍 Location:** {merchant['location']}")
+                        st.markdown("---")
                     
-                    with col1:
-                        # Filter out items already sold by this merchant
-                        existing_item_names = [item[0] for item in merchant['sell']]
-                        available_items = [item for item in item_names if item not in existing_item_names]
-                        
-                        if available_items:
-                            new_item = st.selectbox(
-                                "Select Item",
-                                options=available_items,
-                                key=f"new_item_select_{merchant['name']}"
-                            )
-                        else:
-                            st.info("All items are already in this merchant's inventory")
-                            new_item = None
-                    
-                    with col2:
-                        if available_items:
-                            new_price = st.number_input(
-                                "Price",
-                                min_value=0,
-                                value=1,
-                                step=1,
-                                key=f"new_price_{merchant['name']}"
-                            )
-                    
-                    if available_items:
-                        submitted = st.form_submit_button("➕ Add Item", type="secondary")
-                        
-                        if submitted and new_item:
-                            # Add the new item to the merchant's sell list
-                            updated_sell_items = merchant['sell'] + [[new_item, new_price]]
-                            if update_merchant_sell_items(merchant['name'], updated_sell_items):
-                                st.success(f"Added '{new_item}' to {merchant['name']}'s inventory")
-                                st.rerun()
-                            else:
-                                st.error(f"Failed to add item to {merchant['name']}'s inventory")
-                
-                st.markdown("---")
-                
-                # Delete merchant button
-                if st.button(f"🗑️ Delete '{merchant['name']}'", key=f"delete_merchant_{merchant['name']}"):                    
-                    if delete_merchant(merchant['name']):
-                        st.success(f"Deleted merchant '{merchant['name']}'")
-                        st.rerun()
+                    # Display Buy tags
+                    st.subheader("💰 Buys")
+                    if merchant['buy']:
+                        for tag in merchant['buy']:
+                            st.markdown(f"- {tag}")
                     else:
-                        st.error(f"Failed to delete merchant '{merchant['name']}'")
+                        st.text("Nothing")
+                    
+                    st.markdown("---")
+                    
+                    # Display Sell items
+                    st.subheader("💼 Sells")
+                    if merchant['sell']:
+                        df = pd.DataFrame(merchant['sell'], columns=['Item', 'Price'])
+                        df['Price'] = df['Price'].apply(lambda x: f"{int(x)}")
+                        st.dataframe(df, hide_index=True, width='stretch')
+                    else:
+                        st.text("Nothing")
+                    
+                    # Add item to merchant section
+                    st.markdown("---")
+                    st.subheader("➕ Add Item to Inventory")
+                    
+                    with st.form(f"add_item_to_{merchant['name']}"):
+                        col1, col2 = st.columns([3, 1])
+                        
+                        with col1:
+                            # Filter out items already sold by this merchant
+                            existing_item_names = [item[0] for item in merchant['sell']]
+                            available_items = [item for item in item_names if item not in existing_item_names]
+                            
+                            if available_items:
+                                new_item = st.selectbox(
+                                    "Select Item",
+                                    options=available_items,
+                                    key=f"new_item_select_{merchant['name']}"
+                                )
+                            else:
+                                st.info("All items are already in this merchant's inventory")
+                                new_item = None
+                        
+                        with col2:
+                            if available_items:
+                                new_price = st.number_input(
+                                    "Price",
+                                    min_value=0,
+                                    value=1,
+                                    step=1,
+                                    key=f"new_price_{merchant['name']}"
+                                )
+                        
+                        if available_items:
+                            submitted = st.form_submit_button("➕ Add Item", type="secondary")
+                            
+                            if submitted and new_item:
+                                # Add the new item to the merchant's sell list
+                                updated_sell_items = merchant['sell'] + [[new_item, new_price]]
+                                if update_merchant_sell_items(merchant['name'], updated_sell_items):
+                                    st.success(f"Added '{new_item}' to {merchant['name']}'s inventory")
+                                    st.rerun()
+                                else:
+                                    st.error(f"Failed to add item to {merchant['name']}'s inventory")
+                    
+                    st.markdown("---")
+                    
+                    # Delete merchant button
+                    if st.button(f"🗑️ Delete '{merchant['name']}'", key=f"delete_merchant_{merchant['name']}"):                    
+                        if delete_merchant(merchant['name']):
+                            st.success(f"Deleted merchant '{merchant['name']}'")
+                            st.rerun()
+                        else:
+                            st.error(f"Failed to delete merchant '{merchant['name']}'")
 
 def render_add_item_form():
     """Render the form to add a new item"""
